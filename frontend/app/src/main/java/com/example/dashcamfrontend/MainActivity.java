@@ -17,14 +17,19 @@ import androidx.core.content.ContextCompat;
 import androidx.lifecycle.LifecycleOwner;
 
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.io.ByteArrayOutputStream;
 import java.util.concurrent.ExecutionException;
+
+import utils.BitmapUtils;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -92,10 +97,20 @@ public class MainActivity extends AppCompatActivity {
 
         imageAnalysis.setAnalyzer(AsyncTask.THREAD_POOL_EXECUTOR, new ImageAnalysis.Analyzer() {
             @Override
+            @OptIn(markerClass = ExperimentalGetImage.class)
             public void analyze(@NonNull ImageProxy imageProxy) {
 
-                // Get bitmap and send it to backend
+                // Uses Googles BitmapUtils to convert image proxy to bitmap
+                Bitmap bitmap = BitmapUtils.getBitmap(imageProxy);
                 imageProxy.close();
+
+                // Convert bitmap to Base64 so it can be sent to backend (maybe too slow?)
+                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream);
+                byte[] byteArray = byteArrayOutputStream.toByteArray();
+                String encodedImage = Base64.encodeToString(byteArray, Base64.DEFAULT);
+                Log.i("Encoded image:", encodedImage);
+
             }
         });
 
