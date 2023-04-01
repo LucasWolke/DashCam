@@ -5,7 +5,6 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ExperimentalGetImage;
 import androidx.camera.core.ImageAnalysis;
@@ -22,13 +21,15 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Base64;
 import android.util.Log;
-import android.view.View;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.ByteArrayOutputStream;
 import java.util.concurrent.ExecutionException;
 
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.WebSocket;
 import utils.BitmapUtils;
 
 public class MainActivity extends AppCompatActivity {
@@ -36,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
     private PreviewView previewView;
     private boolean cameraPermission;
     private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
+    private WebSocket webSocket;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,6 +50,15 @@ public class MainActivity extends AppCompatActivity {
         if (!cameraPermission) {
             // Explain that app won't work without the permission.
         }
+
+        // Set up websocket
+        OkHttpClient client = new OkHttpClient();
+        String websocketUrl = "ws://192.168.0.45:8001"; // insert ipv4 address + port here
+        Request request = new Request.Builder().url(websocketUrl).build();
+
+        EchoWebSocketListener listener = new EchoWebSocketListener();
+        webSocket = client.newWebSocket(request, listener);
+
 
         // Follows camerax docs - preview use case
         cameraProviderFuture = ProcessCameraProvider.getInstance(this);
@@ -109,7 +120,9 @@ public class MainActivity extends AppCompatActivity {
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream);
                 byte[] byteArray = byteArrayOutputStream.toByteArray();
                 String encodedImage = Base64.encodeToString(byteArray, Base64.DEFAULT);
-                Log.i("Encoded image:", encodedImage);
+
+                // Send encoded image to backend
+                webSocket.send(encodedImage);
 
             }
         });
