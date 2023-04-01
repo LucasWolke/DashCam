@@ -12,6 +12,7 @@
         android:theme="@style/Theme.DashCamFrontend"
         tools:targetApi="31">
         <activity
+            android:screenOrientation="landscape"
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
