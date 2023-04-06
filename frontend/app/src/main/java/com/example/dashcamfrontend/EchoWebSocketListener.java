@@ -1,11 +1,22 @@
 package com.example.dashcamfrontend;
 
+import android.graphics.RectF;
+import android.util.JsonReader;
 import android.util.Log;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import okhttp3.Response;
 import okhttp3.WebSocketListener;
 
 public class EchoWebSocketListener extends WebSocketListener {
+
+    private DetectionOverlay detectionOverlay;
+
+    public EchoWebSocketListener(DetectionOverlay detectionOverlay) {
+        this.detectionOverlay = detectionOverlay;
+    }
 
     @Override
     public void onOpen(okhttp3.WebSocket webSocket, Response response) {
@@ -14,7 +25,7 @@ public class EchoWebSocketListener extends WebSocketListener {
 
     @Override
     public void onMessage(okhttp3.WebSocket webSocket, String text) {
-        Log.i("Response:", text);
+        detectionOverlay.post(() -> detectionOverlay.parseResponse(text));
     }
 
     @Override
