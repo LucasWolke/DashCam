@@ -6,6 +6,8 @@ import base64
 import numpy as np
 import cv2 as cv2
 
+import time
+
 model = YOLO("../models/detection/runs/detect/train2/weights/best.pt") #import yolov8 detection model
 
 async def handler(websocket):
@@ -32,7 +34,7 @@ def detection(image):
             x2 = box.xyxy.cpu().numpy()[0][2]
             y2 = box.xyxy.cpu().numpy()[0][3]
     
-            ret_str = str(x1) + "," + str(round(y1*1.25)) +","+ str(x2) +","+ str(round(y2*1.25))
+            ret_str = str(x1) + "," + str(y1) +","+ str(x2) +","+ str(y2)
             print(ret_str)
             ret_arr.append(ret_str)
     return ret_arr
@@ -41,8 +43,8 @@ def classifiction(cropped_image):
     exit
 
 def convert_image(image_base64):
-    bytes = base64.b64decode(image_base64)
-    image_array = np.frombuffer(bytes, dtype=np.uint8)
+    #bytes = base64.b64decode(image_base64)
+    image_array = np.frombuffer(image_base64, dtype=np.uint8)
     img = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
     return img
 

@@ -30,6 +30,7 @@ import java.util.concurrent.ExecutionException;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.WebSocket;
+import okio.ByteString;
 import utils.BitmapUtils;
 
 public class MainActivity extends AppCompatActivity {
@@ -38,12 +39,14 @@ public class MainActivity extends AppCompatActivity {
     private boolean cameraPermission;
     private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
     private WebSocket webSocket;
+    private DetectionOverlay detectionOverlay;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         previewView = findViewById(R.id.previewView);
+        detectionOverlay = findViewById(R.id.overlayView);
 
         getCameraPermission();
 
@@ -56,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
         String websocketUrl = "ws://192.168.0.45:8001"; // insert ipv4 address + port here
         Request request = new Request.Builder().url(websocketUrl).build();
 
-        EchoWebSocketListener listener = new EchoWebSocketListener();
+        EchoWebSocketListener listener = new EchoWebSocketListener(detectionOverlay);
         webSocket = client.newWebSocket(request, listener);
 
 
@@ -122,7 +125,7 @@ public class MainActivity extends AppCompatActivity {
                 String encodedImage = Base64.encodeToString(byteArray, Base64.DEFAULT);
 
                 // Send encoded image to backend
-                webSocket.send(encodedImage);
+                webSocket.send(ByteString.of(byteArray));
 
             }
         });
