@@ -2,6 +2,8 @@ package com.example.dashcamfrontend;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -9,9 +11,13 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 public class DetectionOverlay extends View {
 
     private RectF[] rects;
+    private Paint paint;
 
     public DetectionOverlay(Context context) {
         super(context);
@@ -19,6 +25,10 @@ public class DetectionOverlay extends View {
 
     public DetectionOverlay(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
+        paint = new Paint();
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(5f);
+        paint.setColor(Color.RED);
     }
 
     public DetectionOverlay(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
@@ -76,10 +86,12 @@ public class DetectionOverlay extends View {
      *
      * Sets the private variable rectangles, and invalidates the view
      * so onDraw is called.
+     *
      * @param rects Array of rectangles to be drawn
      */
-    public void setRect(RectF[] rects) {
-
+    public void setRects(RectF[] rects) {
+        this.rects = rects;
+        invalidate();
     }
 
     /**
@@ -90,7 +102,14 @@ public class DetectionOverlay extends View {
      */
     @Override
     protected void onDraw(Canvas canvas) {
-
+        super.onDraw(canvas);
+        if (rects != null) {
+            for (RectF rect : rects) {
+                if (rect != null) {
+                    canvas.drawRect(rect, paint);
+                }
+            }
+        }
     }
 
 }
