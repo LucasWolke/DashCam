@@ -1,6 +1,9 @@
 package com.example.dashcamfrontend;
 
 import android.content.Context;
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -14,10 +17,16 @@ import androidx.annotation.Nullable;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.Arrays;
+import java.util.List;
+
 public class DetectionOverlay extends View {
 
     private RectF[] rects;
+    private String[] labels;
     private Paint paint;
+    private Paint textPaint;
+    private Bitmap[] bitmaps;
 
     public DetectionOverlay(Context context) {
         super(context);
@@ -29,6 +38,16 @@ public class DetectionOverlay extends View {
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(5f);
         paint.setColor(Color.RED);
+
+        bitmaps = new Bitmap[43];
+        for (int i = 0; i < 43; i++) { // load all images of traffic signs into buffer
+            String imageName = "sign_" + i;
+            Resources resources = context.getResources();
+            final int resourceId = resources.getIdentifier(imageName, "drawable",
+                    context.getPackageName());
+
+            bitmaps[i] = BitmapFactory.decodeResource(getResources(), resourceId);
+        }
     }
 
     public DetectionOverlay(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
@@ -48,13 +67,15 @@ public class DetectionOverlay extends View {
      */
     public void parseResponse(String response) {
         ObjectMapper mapper = new ObjectMapper();
-        String[] coordinates;
+        String [][] arrays; // split up response array into bounding box coordinates and labels
         try {
-            coordinates = mapper.readValue(response, String[].class);
+            arrays = mapper.readValue(response, String[][].class);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
 
+        String[] coordinates = arrays[0];
+        labels = arrays[1];
         RectF[] rectangles = new RectF[coordinates.length];
 
         for (int i = 0; i < coordinates.length; i++) {
@@ -103,11 +124,16 @@ public class DetectionOverlay extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        if (rects != null) {
+        if (rects != null) { // draw all found bounding boxes
             for (RectF rect : rects) {
                 if (rect != null) {
                     canvas.drawRect(rect, paint);
                 }
+            }
+            int index = 0;
+            for(String label: labels) { // draw image of recognized traffic signs
+                Bitmap bitmap = bitmaps[Integer.parseInt(label)];
+                canvas.drawBitmap(bitmap, 250*(index++), 100, null);
             }
         }
     }
