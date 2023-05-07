@@ -40,6 +40,8 @@ public class MainActivity extends AppCompatActivity {
     private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
     private WebSocket webSocket;
     private DetectionOverlay detectionOverlay;
+    private long time;
+    private EchoWebSocketListener listener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,12 +56,14 @@ public class MainActivity extends AppCompatActivity {
             // Explain that app won't work without the permission.
         }
 
+        time = System.currentTimeMillis();
+
         // Set up websocket
         OkHttpClient client = new OkHttpClient();
         String websocketUrl = "ws://192.168.0.45:8001"; // insert ipv4 address + port here
         Request request = new Request.Builder().url(websocketUrl).build();
 
-        EchoWebSocketListener listener = new EchoWebSocketListener(detectionOverlay);
+        listener = new EchoWebSocketListener(detectionOverlay);
         webSocket = client.newWebSocket(request, listener);
 
 
@@ -120,12 +124,15 @@ public class MainActivity extends AppCompatActivity {
 
                 // Convert bitmap to Base64 so it can be sent to backend (maybe too slow?)
                 ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream);
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream);
                 byte[] byteArray = byteArrayOutputStream.toByteArray();
                 String encodedImage = Base64.encodeToString(byteArray, Base64.DEFAULT);
 
                 // Send encoded image to backend
-                webSocket.send(ByteString.of(byteArray));
+                if (System.currentTimeMillis() - time > 200) { // set delay to not overcrowd backend
+                    time = System.currentTimeMillis();
+                    webSocket.send(ByteString.of(byteArray));
+                }
 
             }
         });
