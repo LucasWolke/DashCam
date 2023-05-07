@@ -24,7 +24,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 executor = ThreadPoolExecutor(10)
 
-modelDetection = tf.keras.models.load_model('../models/classification/less-simple-classification-model2', compile=False)
+modelDetection = tf.keras.models.load_model('../models/classification/classification-model-1', compile=False)
 modelDetection.compile()
 
 model = YOLO("../models/detection/runs/detect/train9/weights/best.pt") #import yolov8 detection model
