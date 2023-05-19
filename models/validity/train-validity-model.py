@@ -23,11 +23,11 @@ train_ds, val_ds, train_labels, val_labels = train_test_split(x, y, test_size=0.
 
 # simple CNN for testing purposes - might be good enough already
 model = tf.keras.Sequential([
-  tf.keras.layers.Dense(units=25, activation='relu', input_dim=2),
-  tf.keras.layers.Dense(units=25, activation='relu'),
-  tf.keras.layers.Dense(units=25, activation='relu'),
-  tf.keras.layers.Dense(units=25, activation='relu'),
-  tf.keras.layers.Dense(units=3),
+  tf.keras.layers.Dense(units=20, activation='relu', input_dim=2),
+  tf.keras.layers.Dense(units=40, activation='relu'),
+  tf.keras.layers.Dense(units=80, activation='relu'),
+  tf.keras.layers.Dense(units=160, activation='relu'),
+  tf.keras.layers.Dense(units=4),
 ])
 
 model.compile(optimizer='adam',
@@ -36,7 +36,20 @@ model.compile(optimizer='adam',
 
 epochs=200
 
-model.fit(train_ds, train_labels, batch_size=batch_size, epochs=epochs, validation_data=(val_ds, val_labels), shuffle=True)
+model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
+    "./validity-model-checkpoint",
+    monitor = "val_loss",
+    verbose = 0,
+    save_best_only = True,
+    save_weights_only = False,
+    mode = "auto",
+    save_freq="epoch",
+    options=None,
+    initial_value_threshold=None,
+)
+
+
+model.fit(train_ds, train_labels, batch_size=batch_size, epochs=epochs, validation_data=(val_ds, val_labels), shuffle=True, callbacks=[model_checkpoint])
 
 model.summary()
 
