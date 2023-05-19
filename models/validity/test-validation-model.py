@@ -7,7 +7,7 @@ import tensorflow as tf
 import csv
 from csv import reader
 
-model = tf.keras.models.load_model('./simple-validity-model')
+model = tf.keras.models.load_model('./validity-model-checkpoint')
 
 # read in correct labels from csv file and store them in an array 
 
@@ -30,6 +30,10 @@ with open('traffic_signs.csv', 'r', newline='') as csvfile:
         else:
             # save wrong inputs to learn where shortcomings of model lie
             wrong.append((int(row[0]),int(row[1])))
+        if total % 500 == 0:
+            print(total)
+        if total >= 6000:
+            break
 print(total)
 print(correct)
 print(correct/total)

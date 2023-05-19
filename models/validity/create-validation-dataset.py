@@ -51,6 +51,7 @@ never_valid = [6, 32, 41, 42]
 # sign2 replaces sign1 -> 0
 # both signs valid -> 1
 # no signs valid -> 2
+# only first sign valid -> 3
 
 # WIP: might not be 100% accurate for now - good enough for testing model accuracy
 # class 1: 0-8 (without 6) -> Replaced by each other, 32 and 5 by 6
@@ -69,6 +70,17 @@ pairs = list(itertools.combinations(traffic_sign_ids, 2))
 training_data = []
 
 
+def checkIfOnlyFirst(sign1, sign2):
+    if sign2 == 6:
+        if sign1 <= 12 and sign1 != 5 and sign1 != 11:
+            return True
+    if sign2 == 32:
+        if sign1 == 12:
+            return True
+    if sign2 == 41 or sign2 == 42:
+        if sign1 <= 8 and sign1 == 12:
+            return True
+    return False
 
 def checkIfSame(sign1, sign2):
     return sign1 == sign2
@@ -78,8 +90,8 @@ def checkIfReplaces(sign1, sign2):
     if(sign1 >= 0 and sign1 <= 8):
         if(sign2 >= 0 and sign2 <= 8):
             return True
-    if(sign1 >= 12 and sign1 <= 40 and sign1 != 12):
-        if(sign2 >= 12 and sign2 <= 40 and sign2 != 12):
+    if(sign1 >= 11 and sign1 <= 40 and sign1 != 12):
+        if(sign2 not in never_valid):
             return True
     return False
 
@@ -94,20 +106,22 @@ def checkIfEnds(sign1, sign2):
         return True
     if(sign1 == 12 and (sign2 == 13 or sign2 == 14)):
         return True
-    if(sign1 >= 13 and sign1 <= 40 and sign1 != 12):
-        if(sign2 == 6 or sign2 == 32 or sign2 == 41 or sign2 == 42):
+    if(sign1 >= 11 and sign1 <= 40 and sign1 != 12):
+        if(sign2 in never_valid):
             return True
     return False
 
 label2_augmentation = []
 
-for x in range(0,42):
-    for y in range(0,42):
-        if(x == 5 or x == 31 or x == 40 or x == 41): # these signs can never be active so we skip them
+for x in range(0,43):
+    for y in range(0,43):
+        if(x in never_valid): # these signs can never be active so we skip them
             continue
         label = 0
-        if (checkIfSame(x, y)):
-            label = 0
+        if (checkIfOnlyFirst(x, y)):
+            label = 3
+        elif (checkIfSame(x, y)):
+            label = 1
         elif (checkIfReplaces(x,y)):
             label = 0
         elif (checkIfEnds(x,y)):
@@ -117,6 +131,15 @@ for x in range(0,42):
             label = 1
 
         training_data.append([x, y, label])
+
+for y in range(0, 10):
+    for x in range(0,42):
+        if x in never_valid:
+            continue
+        if(x >= 13 and x <= 40):
+            training_data.append([x, 43, 2])
+        else:
+            training_data.append([x, 43, 3])
 
 # since there are ~10 times less label 2 we manually add the data in 10 times more often to balance out the dataset
 for x in range(0, 10):
