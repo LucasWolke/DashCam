@@ -20,7 +20,7 @@ count=0
 
 # iterate over all images in the 43 image folders
 for i in range(num_classes): 
-  path = '../../datasets/classification/GTSRB/Train/'+ str(i)
+  path = '../../datasets/classification/GTSRB_augmented/Train/'+ str(i)
   images = os.listdir(path)
   print(i) 
   for img_name in images:
@@ -75,7 +75,7 @@ model.fit(train_ds, train_labels, batch_size=batch_size, epochs=epochs, validati
 
 model.summary()
 
-model.save('./classification-model-1/') 
+model.save('./classification-model-augmented/') 
 
 # results don't significantly differ from the simple model (about 95-96% on test data), but results seem to be better in testing
 
