@@ -25,7 +25,7 @@ model_detection = YOLO("../models/detection/runs/detect/train9/weights/best.pt")
 print("websocket ready")
 
 new_labels = []
-valid_labels = [1]
+valid_labels = []
 
 count = 0
 
@@ -74,8 +74,12 @@ def detection(image):
 
 def validation(new_labels):
     global valid_labels
+    if (len(new_labels) == 0 and len(valid_labels) == 0):
+        return []
     if len(new_labels) == 0: # if there are no new labels we add 43, which stands for no traffic sign
         new_labels.append(43)
+    if len(valid_labels) == 0:
+        valid_labels.append(43)
     label_combinations = []
     for x in valid_labels: # create all label combinations of sign1's and sign2's
         for y in new_labels:
