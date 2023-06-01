@@ -34,7 +34,7 @@ model.compile(optimizer='adam',
               loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
               metrics=['SparseCategoricalAccuracy'])
 
-epochs=200
+epochs=300
 
 model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
     "./validity-model-checkpoint",

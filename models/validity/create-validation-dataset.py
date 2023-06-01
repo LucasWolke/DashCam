@@ -132,6 +132,7 @@ for x in range(0,43):
 
         training_data.append([x, y, label])
 
+# data if there is no second sign
 for y in range(0, 10):
     for x in range(0,42):
         if x in never_valid:
@@ -139,7 +140,17 @@ for y in range(0, 10):
         if(x >= 13 and x <= 40):
             training_data.append([x, 43, 2])
         else:
-            training_data.append([x, 43, 3])
+            for j in range(0,5):
+                training_data.append([x, 43, 3])
+
+# data if there is no first sign
+for y in range(0, 10):
+    for x in range(0,42):
+        if x in never_valid:
+            for j in range(0,5):
+                training_data.append([43, x, 2])
+        else:
+                training_data.append([43, x, 0])
 
 # since there are ~10 times less label 2 we manually add the data in 10 times more often to balance out the dataset
 for x in range(0, 10):
