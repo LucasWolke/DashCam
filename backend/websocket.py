@@ -1,4 +1,3 @@
-from typing import Counter
 import websockets
 import asyncio
 from ultralytics import YOLO
@@ -14,40 +13,45 @@ import tensorflow as tf
 
 from concurrent.futures import ThreadPoolExecutor, wait
 
-model_classification = tf.keras.models.load_model('../models/classification/classification-model-1', compile=False)
+model_classification = tf.keras.models.load_model('../models/classification/col-50-augmented-autocontrast-best', compile=False)
 model_classification.compile()
 
 model_validity = tf.keras.models.load_model('../models/validity/validity-model-checkpoint', compile=False)
 model_validity.compile()
 
-model_detection = YOLO("../models/detection/runs/detect/train9/weights/best.pt") #import yolov8 detection model
+model_detection = YOLO("../models/detection/runs/detect/train8/weights/best.pt") #import yolov8 detection model
 
 print("websocket ready")
 
 new_labels = []
 valid_labels = []
 
-count = 0
-
 detection_results = []
+
+timeStart = 0
 
 async def handler(websocket):
     while True:
+            global timeStart
             global valid_labels
             global new_labels
             image = await websocket.recv()
+            timeStart = time.time()
             image = convert_image(image)
-            response = detection(image)
+            response = await detection(image, websocket)
             response = (json.dumps(response))
             await websocket.send(response)
             new_labels = []
+            end = time.time()
+            print("Total time:" + str(end - timeStart))
 
 async def main():
-    async with websockets.serve(handler, "192.168.0.45", 8001): # insert ipv4 address here
+    async with websockets.serve(handler, "192.168.178.22", 8001): # insert ipv4 address here
         await asyncio.Future()
 
-def detection(image):
-    results = model_detection(image, conf=0.75)
+async def detection(image, websocket):
+    global timeStart
+    results = model_detection(image, conf=0.5)
     global valid_labels
     global new_labels
     images = []
@@ -66,6 +70,10 @@ def detection(image):
 
             images.append(preprocess_classification(image, y1, y2, x1, x2))
 
+        response = (json.dumps([ret_arr, valid_labels])) # send the bounding boxes back right away for lower latency
+
+        await websocket.send(response)
+
         new_labels = classification(images)
         
         valid_labels = validation(list(set(new_labels)))
@@ -73,9 +81,8 @@ def detection(image):
         return ([ret_arr, valid_labels])
 
 def validation(new_labels):
+    print(new_labels)
     global valid_labels
-    if (len(new_labels) == 0 and len(valid_labels) == 0):
-        return []
     if len(new_labels) == 0: # if there are no new labels we add 43, which stands for no traffic sign
         new_labels.append(43)
     if len(valid_labels) == 0:
@@ -142,17 +149,17 @@ def classification(images):
         score = tf.nn.softmax(prediction)
         max_prob = np.max(score.numpy())
         if max_prob < 0.75: # when the model is not more than 75% sure about its prediction we disregard its prediction (might need to tweak the amount!)
+            print("disregarding prediction")
             continue
         new_labels.append(int(np.argmax(score)))
 
     return new_labels
 
 def preprocess_classification(image, y1, y2, x1, x2): # preprocessing depends on model implementation! (grayscale + equalisation + normalisation)
-    global count
-    image = image[int(y1):int(y2), int(x1):int(x2)]
+    image = image[int(y1-5):int(y2+5), int(x1-5):int(x2+5)]
+    #image = image[int(y1):int(y2), int(x1):int(x2)]
     image = Image.fromarray(image)
-    image = ImageOps.grayscale(image)
-    image = ImageOps.equalize(image, mask = None)
+    image = ImageOps.autocontrast(image)
     image = image.resize((32,32))
     image = np.array(image) 
     image = image / 255.0
@@ -165,7 +172,7 @@ def convert_image(image_bytes):
     #bytes = base64.b64decode(image_bytes)
     image_array = np.frombuffer(image_bytes, dtype=np.uint8)
     img = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
 if __name__ == "__main__":
