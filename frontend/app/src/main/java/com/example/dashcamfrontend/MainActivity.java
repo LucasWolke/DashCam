@@ -1,10 +1,14 @@
 package com.example.dashcamfrontend;
 
+import static androidx.camera.core.AspectRatio.RATIO_16_9;
+
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
+import androidx.annotation.Size;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.camera.core.AspectRatio;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ExperimentalGetImage;
 import androidx.camera.core.ImageAnalysis;
@@ -15,12 +19,16 @@ import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.LifecycleOwner;
 
+import android.app.Dialog;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Base64;
 import android.util.Log;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.Toast;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
@@ -43,6 +51,8 @@ public class MainActivity extends AppCompatActivity {
     private long time;
     private EchoWebSocketListener listener;
 
+    private float aspectRatio = -1f;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -56,11 +66,21 @@ public class MainActivity extends AppCompatActivity {
             // Explain that app won't work without the permission.
         }
 
+        showWebSocketPopup();
+
+    }
+
+    private final ActivityResultLauncher<String> requestPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
+                cameraPermission = isGranted;
+            });
+
+    private void setupWebsocket(String ipAddress) {
         time = System.currentTimeMillis();
 
         // Set up websocket
         OkHttpClient client = new OkHttpClient();
-        String websocketUrl = "ws://192.168.0.45:8001"; // insert ipv4 address + port here
+        String websocketUrl = "ws://" + ipAddress + ":8001"; // insert ipv4 address + port here
         Request request = new Request.Builder().url(websocketUrl).build();
 
         listener = new EchoWebSocketListener(detectionOverlay);
@@ -79,13 +99,7 @@ public class MainActivity extends AppCompatActivity {
                 // This should never be reached.
             }
         }, ContextCompat.getMainExecutor(this));
-
     }
-
-    private final ActivityResultLauncher<String> requestPermissionLauncher =
-            registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
-                cameraPermission = isGranted;
-            });
 
     private void getCameraPermission(){
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) ==
@@ -97,14 +111,36 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void showWebSocketPopup() {
+        // Create dialog
+        Dialog dialog = new Dialog(this);
+        dialog.setContentView(R.layout.popup_layout);
+
+        // Get views from dialog layout
+        EditText editTextWebSocketAddress = dialog.findViewById(R.id.editTextWebSocketAddress);
+        Button buttonConnectWebSocket = dialog.findViewById(R.id.buttonConnectWebSocket);
+
+        // Set click listener for button
+        buttonConnectWebSocket.setOnClickListener(view -> {
+            String ip = editTextWebSocketAddress.getText().toString().trim();
+            if (!ip.isEmpty()) {
+                // Set up WebSocket
+                setupWebsocket(ip);
+                dialog.dismiss();
+            } else {
+                Toast.makeText(this, "Please enter a valid WebSocket IP address", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        dialog.show();
+    }
+
     void bindPreview(@NonNull ProcessCameraProvider cameraProvider) {
         Preview preview = new Preview.Builder()
                 .build();
-
         CameraSelector cameraSelector = new CameraSelector.Builder()
                 .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                 .build();
-
         preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
         // Follows camerax docs - image analysis use case
@@ -112,31 +148,33 @@ public class MainActivity extends AppCompatActivity {
                 new ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build();
-
         imageAnalysis.setAnalyzer(AsyncTask.THREAD_POOL_EXECUTOR, new ImageAnalysis.Analyzer() {
             @Override
             @OptIn(markerClass = ExperimentalGetImage.class)
-            public void analyze(@NonNull ImageProxy imageProxy) {
-
+            public void analyze(@NonNull ImageProxy imageProxy) { // called for every new frame
                 // Uses Googles BitmapUtils to convert image proxy to bitmap
                 Bitmap bitmap = BitmapUtils.getBitmap(imageProxy);
                 imageProxy.close();
-
-                // Convert bitmap to Base64 so it can be sent to backend (maybe too slow?)
+                if (aspectRatio < 0) {
+                    // Calculate the aspect ratio if it hasn't been calculated before
+                    int imageWidth = imageProxy.getWidth();
+                    int imageHeight = imageProxy.getHeight();
+                    detectionOverlay.setAspectRatio(imageWidth, imageHeight);
+                }
+                // Compress bitmap to JPEG
                 ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream);
+                if(bitmap != null) {
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream);
+                }
                 byte[] byteArray = byteArrayOutputStream.toByteArray();
-                String encodedImage = Base64.encodeToString(byteArray, Base64.DEFAULT);
-
-                // Send encoded image to backend
+                // Send ByteString of image to backend
                 if (System.currentTimeMillis() - time > 200) { // set delay to not overcrowd backend
-                    time = System.currentTimeMillis();
+                    time = System.currentTimeMillis(); // update time
                     webSocket.send(ByteString.of(byteArray));
                 }
-
             }
         });
-
-        cameraProvider.bindToLifecycle((LifecycleOwner) this, cameraSelector, imageAnalysis, preview);
+        // bind image analysis
+        cameraProvider.bindToLifecycle(this, cameraSelector, imageAnalysis, preview);
     }
 }
