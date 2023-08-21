@@ -28,6 +28,11 @@ public class DetectionOverlay extends View {
     private Paint textPaint;
     private Bitmap[] bitmaps;
 
+    private int imageWidth;
+    private int imageHeight;
+
+    private float aspectRatio;
+
     public DetectionOverlay(Context context) {
         super(context);
     }
@@ -66,6 +71,7 @@ public class DetectionOverlay extends View {
      * @param response the response from the backend, containing the bounding box cords
      */
     public void parseResponse(String response) {
+        Log.i("response", response);
         ObjectMapper mapper = new ObjectMapper();
         String [][] arrays; // split up response array into bounding box coordinates and labels
         try {
@@ -79,28 +85,28 @@ public class DetectionOverlay extends View {
         RectF[] rectangles = new RectF[coordinates.length];
 
         for (int i = 0; i < coordinates.length; i++) {
+            // example coordinates array: ["283.0,3.0,311.0,37.0", "248.0,3.0,277.0,37.0"]
             String [] cords = coordinates[i].split(",");
             if(cords.length == 4) {
-
-                int screenHeight = this.getHeight();
-                int screenWidth = this.getWidth();
-
-                float realHeight = screenWidth*0.75F;
+                float screenHeight = this.getHeight();
+                float screenWidth = this.getWidth();
+                // adjust height to aspect ratio of frame - otherwise cords are distorted
+                float realHeight = screenWidth*this.aspectRatio;
                 float heightDiff = (realHeight - screenHeight) / 2;
-
-                float left = (Float.parseFloat(cords[0])/640)*screenWidth;
-                float top = (((Float.parseFloat(cords[1]))/480)*realHeight);
-                float right = (Float.parseFloat(cords[2])/640)*screenWidth;
-                float bottom = (((Float.parseFloat(cords[3]))/480)*realHeight);
-
+                // adjust frame coordinates to phone screen
+                float left = (Float.parseFloat(cords[0])/this.imageWidth)*screenWidth;
+                float top = (Float.parseFloat(cords[1])/this.imageHeight)*realHeight;
+                float right = (Float.parseFloat(cords[2])/this.imageWidth)*screenWidth;
+                float bottom = (Float.parseFloat(cords[3])/this.imageHeight)*realHeight;
+                // cut off excess height
                 bottom -= heightDiff;
                 top -= heightDiff;
 
-                RectF exampleRectangle2 = new RectF(left, top, right, bottom);
-                rectangles[i] = exampleRectangle2;
+                RectF tempRectangle = new RectF(left, top, right, bottom);
+                rectangles[i] = tempRectangle;
             }
-            setRects(rectangles);
         }
+        setRects(rectangles); // invalidates view, triggers new onDraw
     }
 
     /**
@@ -138,4 +144,9 @@ public class DetectionOverlay extends View {
         }
     }
 
+    public void setAspectRatio(int imageWidth, int imageHeight) {
+        this.imageWidth = imageWidth;
+        this.imageHeight = imageHeight;
+        this.aspectRatio = (float) imageHeight / imageWidth;
+    }
 }
