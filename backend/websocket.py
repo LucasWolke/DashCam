@@ -1,3 +1,4 @@
+from ipaddress import ip_address
 import websockets
 import asyncio
 from ultralytics import YOLO
@@ -13,6 +14,8 @@ import tensorflow as tf
 
 from concurrent.futures import ThreadPoolExecutor, wait
 
+print("Loading deep learning models...")
+
 model_classification = tf.keras.models.load_model('../models/classification/col-50-augmented-autocontrast-best', compile=False)
 model_classification.compile()
 
@@ -21,9 +24,10 @@ model_validity.compile()
 
 model_detection = YOLO("../models/detection/runs/detect/train8/weights/best.pt") #import yolov8 detection model
 
-print("websocket ready")
+print("Models loaded succesfully.")
+print("Enter the IP address where the WebSocket should be hosted:")
+ip_address = input()
 
-new_labels = []
 valid_labels = []
 
 detection_results = []
@@ -46,19 +50,21 @@ async def handler(websocket):
             print("Total time:" + str(end - timeStart))
 
 async def main():
-    async with websockets.serve(handler, "192.168.178.22", 8001): # insert ipv4 address here
+    async with websockets.serve(handler, ip_address, 8001): # insert ipv4 address here
+        print("WebSocket created on ip " + ip_address + ":8001")
+        print("Enter this ip in the app to start detections!")
         await asyncio.Future()
 
 async def detection(image, websocket):
-    global timeStart
-    results = model_detection(image, conf=0.5)
     global valid_labels
-    global new_labels
-    images = []
+    # disregard predictions with >50% confidence
+    results = model_detection(image, conf=0.5)
+    rois = []
     ret_arr = []
     for result in results:
         boxes = result.boxes
-        for box in boxes:  # get the vertices of the bounding box
+        # get the vertices of the bounding box
+        for box in boxes:
             x1 = box.xyxy.cpu().numpy()[0][0]
             y1 = box.xyxy.cpu().numpy()[0][1]
 
@@ -68,13 +74,16 @@ async def detection(image, websocket):
             ret_str = str(x1) + "," + str(y1) +","+ str(x2) +","+ str(y2)
             ret_arr.append(ret_str)
 
-            images.append(preprocess_classification(image, y1, y2, x1, x2))
+            # preprocessing before classification
+            rois.append(preprocess_classification(image, y1, y2, x1, x2))
 
-        response = (json.dumps([ret_arr, valid_labels])) # send the bounding boxes back right away for lower latency
+        # send the bounding boxes back right away for lower latency
+        response = (json.dumps([ret_arr, valid_labels]))
 
         await websocket.send(response)
 
-        new_labels = classification(images)
+        # classification + validation
+        new_labels = classification(rois)
         
         valid_labels = validation(list(set(new_labels)))
 
@@ -83,19 +92,21 @@ async def detection(image, websocket):
 def validation(new_labels):
     print(new_labels)
     global valid_labels
-    if len(new_labels) == 0: # if there are no new labels we add 43, which stands for no traffic sign
+    # 43 added when no new labels, stands for "no" sign
+    if len(new_labels) == 0:
         new_labels.append(43)
     if len(valid_labels) == 0:
         valid_labels.append(43)
     label_combinations = []
-    for x in valid_labels: # create all label combinations of sign1's and sign2's
+    # create all label combinations of sign1's and sign2's
+    for x in valid_labels:
         for y in new_labels:
             input = (int(x),int(y))
             arr = np.expand_dims(input, axis=0)
             label_combinations.append(arr)
 
     if(len(label_combinations) == 0):
-            return []    
+            return []
 
     with tf.device("gpu:0"):
         predictions = model_validity.predict(np.vstack(label_combinations))
@@ -136,28 +147,18 @@ def validation_process_prediction(predictions, label_combinations):
 
     return [valid_signs]
 
-def classification(images):
+# preprocessing depends on model implementation!
+def preprocess_classification(image, y1, y2, x1, x2):
 
-    new_labels = []
-    if(len(images) == 0):
-        return new_labels
-    
-    with tf.device("gpu:0"):
-        predictions = model_classification.predict(np.vstack(images))
+    # make bounding boxes less tight by adding 5px padding
+    x1 = max(0, int(x1) - 5)
+    y1 = max(0, int(y1) - 5)
+    x2 = min(image.shape[1], int(x2) + 5)
+    y2 = min(image.shape[0], int(y2) + 5) 
 
-    for prediction in predictions:
-        score = tf.nn.softmax(prediction)
-        max_prob = np.max(score.numpy())
-        if max_prob < 0.75: # when the model is not more than 75% sure about its prediction we disregard its prediction (might need to tweak the amount!)
-            print("disregarding prediction")
-            continue
-        new_labels.append(int(np.argmax(score)))
-
-    return new_labels
-
-def preprocess_classification(image, y1, y2, x1, x2): # preprocessing depends on model implementation! (grayscale + equalisation + normalisation)
-    image = image[int(y1-5):int(y2+5), int(x1-5):int(x2+5)]
-    #image = image[int(y1):int(y2), int(x1):int(x2)]
+    # autocontrast, resizing, normalisation
+    # cut ROIs out
+    image = image[y1:y2, x1:x2]
     image = Image.fromarray(image)
     image = ImageOps.autocontrast(image)
     image = image.resize((32,32))
@@ -167,11 +168,34 @@ def preprocess_classification(image, y1, y2, x1, x2): # preprocessing depends on
 
     return image
 
-def convert_image(image_bytes):
+def classification(images):
 
-    #bytes = base64.b64decode(image_bytes)
+    new_labels = []
+    if(len(images) == 0):
+        return new_labels
+    
+    with tf.device("gpu:0"):
+        # vstack creates a batch
+        predictions = model_classification.predict(np.vstack(images))
+    for prediction in predictions:
+        # get probability distribution
+        score = tf.nn.softmax(prediction)
+        # get probability of highest score
+        max_prob = np.max(score.numpy())
+        # predictions with a confidence below 75% are disregarded
+        if max_prob < 0.75:
+            continue
+        # highest score is the predicted sign
+        new_labels.append(int(np.argmax(score)))
+
+    return new_labels
+
+def convert_image(image_bytes):
+    # byte array to np array
     image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    # convert array to image
     img = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    # cv2 images are BGR per default, convert to RGB
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
