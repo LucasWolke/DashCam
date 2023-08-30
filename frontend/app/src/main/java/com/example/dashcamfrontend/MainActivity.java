@@ -168,7 +168,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 byte[] byteArray = byteArrayOutputStream.toByteArray();
                 // Send ByteString of image to backend
-                if (System.currentTimeMillis() - time > 200) { // set delay to not overcrowd backend
+                if (System.currentTimeMillis() - time > 600) { // set delay to not overcrowd backend
                     time = System.currentTimeMillis(); // update time
                     webSocket.send(ByteString.of(byteArray));
                 }
