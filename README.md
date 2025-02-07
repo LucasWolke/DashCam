@@ -1,8 +1,8 @@
 # 🚦DashCam App
 
-**DashCam App** is an full-stack application that aims to enhance driving safety through real-time traffic sign detection and classification using deep learning. 
+**DashCam App** is an full-stack application that detects and classifies traffic signs in real-time using multiple deep learning models.
 
-![App Preview](https://i.imgur.com/eHSFW8U.gif)
+![App Preview](https://i.imgur.com/8I41dmz.png)
 
 
 ## Features
